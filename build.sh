@@ -7,10 +7,11 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 BUILD="$ROOT/.build/native"
 mkdir -p "$BUILD"
 cp "$ROOT/Main.swift" "$BUILD/main.swift"
-xcrun swiftc -swift-version 5 -target arm64-apple-macosx14.0 -O -framework AppKit -framework SwiftUI -framework Carbon -framework ApplicationServices "$ROOT/Delivery.swift" "$ROOT/Jar.swift" "$ROOT/PackedScene.swift" "$BUILD/main.swift" -o "$APP/Contents/MacOS/TuanTuan"
+xcrun swiftc -swift-version 5 -target arm64-apple-macosx14.0 -O -framework AppKit -framework SwiftUI -framework Carbon -framework ApplicationServices "$ROOT/Delivery.swift" "$ROOT/AccountUsage.swift" "$ROOT/Jar.swift" "$ROOT/PackedScene.swift" "$BUILD/main.swift" -o "$APP/Contents/MacOS/TuanTuan"
 cp "$ROOT/Resources/"pet-*.png "$APP/Contents/Resources/"
 cp "$ROOT/Resources/"prop-*.png "$APP/Contents/Resources/"
 cp "$ROOT/Resources/pile-scene.png" "$ROOT/Resources/pile-expressions.png" "$APP/Contents/Resources/"
+cp "$ROOT/Resources/"claude-eye-*.png "$ROOT/Resources/claude-eyes.json" "$APP/Contents/Resources/"
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

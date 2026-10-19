@@ -5,7 +5,7 @@ import Carbon
 
 let orange = Color(red: 0.86, green: 0.32, blue: 0.13)
 let ink = Color(red: 0.19, green: 0.18, blue: 0.16)
-func sprite(_ client: Client) -> NSImage { NSImage(contentsOf: Bundle.main.resourceURL!.appendingPathComponent(client.spriteName + ".png")) ?? NSImage() }
+func sprite(_ client: Client) -> NSImage { client == .claude ? ClaudeArt.image : (NSImage(contentsOf: Bundle.main.resourceURL!.appendingPathComponent(client.spriteName + ".png")) ?? NSImage()) }
 
 final class PetModel: ObservableObject {
     @Published private(set) var client: Client = .chatgpt
@@ -97,7 +97,7 @@ struct ComposerView: View {
                     Text("开启辅助功能后可直接投递").font(.system(size: 10)).foregroundStyle(.secondary); Spacer()
                     Button("去开启 ↗") { model.delivery.permissionSettings() }.buttonStyle(.plain).font(.system(size: 10, weight: .medium)).foregroundStyle(orange)
                 }.padding(.top, 3)
-            } else { Text("草稿独立保留 · 点击罐中另一只宠物切换").font(.system(size: 10)).foregroundStyle(.tertiary).padding(.top, 3) }
+            } else { Text("草稿独立保留 · 右键罐子选择角色写消息").font(.system(size: 10)).foregroundStyle(.tertiary).padding(.top, 3) }
         }.padding(20).frame(width: 360, height: 365, alignment: .topLeading).foregroundStyle(ink)
             .background(Color(red: 0.98, green: 0.97, blue: 0.94).opacity(0.99)).clipShape(RoundedRectangle(cornerRadius: 23))
             .overlay(RoundedRectangle(cornerRadius: 23).stroke(Color.white.opacity(0.9), lineWidth: 1)).padding(12).preferredColorScheme(.light)
@@ -123,6 +123,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         composer = panel(size: NSSize(width: 384, height: 389)); composer.title = "ChatGPT · 对话"
         composer.contentView = NSHostingView(rootView: ComposerView(model: model))
         petView.chosen = { [weak self] client in self?.show(client) }; petView.moved = { [weak self] in self?.petMoved() }
+        petView.opened = { [weak self] client in self?.openClient(client) }
         model.close = { [weak self] in self?.hideComposer() }; model.onActivity = { [weak self] client in self?.petView.characters[client]?.react() }
         pet.orderFrontRegardless(); setupStatusItem(); setupShortcut()
         refreshTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in self?.model.refresh() }
@@ -150,6 +151,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSAnimationContext.runAnimationGroup { context in context.duration = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 0 : 0.18; composer.animator().alphaValue = 1 }
         } else { composer.makeKeyAndOrderFront(nil) }
     }
+    func openClient(_ client: Client) {
+        guard let url = client.applicationURL else {
+            let alert = NSAlert(); alert.messageText = "没有找到 " + client.name
+            alert.informativeText = "请先安装对应客户端，再双击宠物打开。"; alert.runModal(); return
+        }
+        let configuration = NSWorkspace.OpenConfiguration(); configuration.activates = true
+        NSWorkspace.shared.openApplication(at: url, configuration: configuration) { app, error in
+            if app == nil || error != nil {
+                DispatchQueue.main.async {
+                    let alert = NSAlert(); alert.messageText = client.name + " 打开失败"
+                    alert.informativeText = "请检查客户端安装状态。"; alert.runModal()
+                }
+            }
+        }
+    }
     func hideComposer() { composer.orderOut(nil); petView.setActive(nil) }
     func petMoved() { positionComposer(); UserDefaults.standard.set(pet.frame.minX, forKey: "jarX"); UserDefaults.standard.set(pet.frame.minY, forKey: "jarY") }
     @objc func toggle() { if composer.isVisible { hideComposer() } else { show(model.client) } }
@@ -169,7 +185,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let delegate = Unmanaged<AppDelegate>.fromOpaque(userData).takeUnretainedValue(); DispatchQueue.main.async { delegate.toggle() }; return noErr
         }, 1, &type, Unmanaged.passUnretained(self).toOpaque(), nil)
         let result = RegisterEventHotKey(UInt32(kVK_Space), UInt32(optionKey), EventHotKeyID(signature: 0x5455414e, id: 1), GetApplicationEventTarget(), 0, &hotKey)
-        if result != noErr { model.status = "⌥Space 已被占用，点击罐中的宠物也能呼出。" }
+        if result != noErr { model.status = "⌥Space 已被占用，可从罐子右键菜单或菜单栏打开对话。" }
     }
     func applicationWillTerminate(_ notification: Notification) {
         refreshTimer?.invalidate(); if let localMonitor { NSEvent.removeMonitor(localMonitor) }; if let globalMonitor { NSEvent.removeMonitor(globalMonitor) }; if let hotKey { UnregisterEventHotKey(hotKey) }
@@ -202,7 +218,7 @@ if let index = CommandLine.arguments.firstIndex(of: "--render-expression"), Comm
     let jar = PetJarView(frame: NSRect(origin: .zero, size: JarGeometry.size))
     let stationaryFrames = jar.characters.mapValues { $0.frame }
     jar.characters.values.forEach { $0.freezeExpression = true }
-    for (point, target) in [(NSPoint(x: 99, y: 197), Client.chatgpt), (NSPoint(x: 180, y: 145), Client.grok), (NSPoint(x: 101, y: 99), Client.muse)] {
+    for (point, target) in [(NSPoint(x: 99, y: 197), Client.chatgpt), (NSPoint(x: 180, y: 145), Client.grok), (NSPoint(x: 101, y: 99), Client.muse), (NSPoint(x: 182, y: 79), Client.claude)] {
         precondition((jar.hitTest(point) as? CharacterView)?.client == target, "mouse hit routing failed: \(target)")
         jar.updateHover(at: point)
         precondition(jar.hoveredClient == target)
