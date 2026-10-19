@@ -1,0 +1,47 @@
+{
+  "tool": "built-in image_gen",
+  "transparent_background": true,
+  "reference": "User supplied poster; Grok glossy sphere and later props use self-contained descriptions.",
+  "prompts": [
+    {
+      "name": "pet-grok-glossy",
+      "prompt": "Asset type: one isolated 3D object sprite for a densely packed desktop toy jar. The supplied poster is a material and rendering style reference only. Premium tactile photorealistic 3D toy render, soft studio lighting from upper left, crisp material detail, fully visible silhouette, centered in a square canvas, object fills 85 percent of canvas with a small even transparent margin. True alpha transparency. No background, no floor, no cast shadow, no text, no logos, no extra objects. Create ONE spherical jet-black highly polished glossy resin creature exactly like the small shiny black balls with two white eyes in the supplied poster. Round almost perfect sphere with very slight squishy asymmetry; obsidian black surface, strong broad white studio-light reflections near upper-left edge and small cool reflections around its curvature. Two simple ivory-white vertical capsule eyes on the front, standing upright close together, no pupils and no mouth. It must read as a shiny BLACK BALL, not grey, not furry, not an icon tile. Face is in the middle of the front, unobstructed. No limbs, no accessories."
+    },
+    {
+      "name": "prop-chrome",
+      "prompt": "Asset type: one isolated 3D object sprite for a densely packed desktop toy jar. The supplied poster is a material and rendering style reference only. Premium tactile photorealistic 3D toy render, soft studio lighting from upper left, crisp material detail, fully visible silhouette, centered in a square canvas, object fills 85 percent of canvas with a small even transparent margin. True alpha transparency. No background, no floor, no cast shadow, no text, no logos, no extra objects. Create ONE softly inflated four-point star made of mirror-polished liquid silver chrome, like the large silver star-shaped blob in the reference. Four rounded irregular lobes, smooth mercury-like reflective surface, bold white and charcoal reflections, chunky 3D depth, asymmetrical but balanced. It is an abstract tactile object: NO eyes, NO face, NO mouth."
+    },
+    {
+      "name": "prop-knit",
+      "prompt": "Asset type: one isolated 3D object sprite for a densely packed desktop toy jar. The supplied poster is a material and rendering style reference only. Premium tactile photorealistic 3D toy render, soft studio lighting from upper left, crisp material detail, fully visible silhouette, centered in a square canvas, object fills 85 percent of canvas with a small even transparent margin. True alpha transparency. No background, no floor, no cast shadow, no text, no logos, no extra objects. Create ONE mustard-yellow rounded cube covered in thick soft cable-knit wool. Chunky tactile ribbed knit stitches wrapping naturally around its corners, warm ochre yarn, softly stuffed squishy toy volume. It is an abstract tactile object: NO eyes, NO face, NO mouth. Three-quarter front view so the top and side textures are visible."
+    },
+    {
+      "name": "prop-moss",
+      "prompt": "Asset type: one isolated 3D object sprite for a densely packed desktop toy jar. The supplied poster is a material and rendering style reference only. Premium tactile photorealistic 3D toy render, soft studio lighting from upper left, crisp material detail, fully visible silhouette, centered in a square canvas, object fills 85 percent of canvas with a small even transparent margin. True alpha transparency. No background, no floor, no cast shadow, no text, no logos, no extra objects. Create ONE lush moss-green rounded cushion-like sphere, entirely covered in very dense tiny moss plants, with a few miniature white daisies and yellow centers embedded in the moss. Rich realistic fine greenery, soft squishy natural ball, no pot. It is an abstract tactile object: NO eyes, NO face, NO mouth."
+    },
+    {
+      "name": "pet-grok-glossy",
+      "prompt": "One isolated premium 3D object for a toy-jar sprite. Centered, front three-quarter view, whole object visible with small even margins on a square canvas. Soft studio light from upper left. True transparent alpha background, no floor, no cast shadow, no text, no logo, no other objects. A polished glossy black spherical toy with two small white vertical capsule-shaped eye marks centered on the front. Deep jet-black smooth resin, broad bright softbox highlight on its upper left curvature, subtle reflective rim. Almost perfectly round and slightly squishy. Minimal friendly design, no mouth, no arms, no legs, no fur. Glossy black surface, white oval eye marks."
+    },
+    {
+      "name": "prop-amber",
+      "prompt": "One isolated premium 3D object for a toy-jar sprite. Centered, front three-quarter view, whole object visible with small even margins on a square canvas. Soft studio light from upper left. True transparent alpha background, no floor, no cast shadow, no text, no logo, no other objects. A chunky irregular rounded cube of translucent golden-yellow amber-colored glass jelly. Smooth soft squishy pebble form, warm honey gold, realistic refraction, luminous glass edges and white specular highlights, a few tiny suspended bubbles inside. Abstract material toy with no eyes, no face, no mouth."
+    },
+    {
+      "name": "prop-bubble",
+      "prompt": "One isolated premium 3D object for a toy-jar sprite. Centered, front three-quarter view, whole object visible with small even margins on a square canvas. Soft studio light from upper left. True transparent alpha background, no floor, no cast shadow, no text, no logo, no other objects. A beautiful iridescent glass bubble sphere with a thick transparent opal-glass surface and a pale lavender tint, pearlescent pink, turquoise and golden shifting reflections, glossy white studio highlights, delicate optical refraction. Real glass orb rather than a flat illustration. Abstract material toy with no eyes, no face, no mouth."
+    },
+    {
+      "name": "prop-stone",
+      "prompt": "One isolated premium tactile 3D material object sprite for a colorful densely packed toy jar. Centered, front three-quarter view, whole object visible with small even transparent margins on square canvas. Soft studio light from upper left, realistic texture, rich material. True transparent alpha background, no floor, no cast shadow, no text, no logo, no other objects, no eyes, no face, no mouth. An ivory terrazzo pebble shaped like a chunky soft rounded cube. Warm white porous ceramic/concrete surface with scattered tiny irregular black, dark grey and a few tan stone flecks. Rounded corners, tactile mineral speckle texture, substantial toy volume. Three-quarter view showing the top and one side."
+    },
+    {
+      "name": "prop-wood",
+      "prompt": "One isolated premium tactile 3D material object sprite for a colorful densely packed toy jar. Centered, front three-quarter view, whole object visible with small even transparent margins on square canvas. Soft studio light from upper left, realistic texture, rich material. True transparent alpha background, no floor, no cast shadow, no text, no logo, no other objects, no eyes, no face, no mouth. A softly rounded squishy walnut-wood cube. Rich warm medium brown and dark chocolate flowing swirling wood grain running continuously around corners. Fine polished natural timber finish with a gentle satin sheen, rich organic material detail, chunky rounded toy proportions. Three-quarter view showing top and side."
+    },
+    {
+      "name": "prop-blue",
+      "prompt": "One isolated premium tactile 3D material object sprite for a colorful densely packed toy jar. Centered, front three-quarter view, whole object visible with small even transparent margins on square canvas. Soft studio light from upper left, realistic texture, rich material. True transparent alpha background, no floor, no cast shadow, no text, no logo, no other objects, no eyes, no face, no mouth. A vivid electric cobalt blue rounded triangular blob pebble made of glazed handmade ceramic. Glossy wet-looking rich blue glaze with tactile tiny irregular pits and rounded bumps, slightly squishy triangular cushion shape, bold white specular highlight, solid vivid blue all over. Charming abstract chunky toy form."
+    }
+  ]
+}
