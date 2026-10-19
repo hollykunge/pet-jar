@@ -2,13 +2,13 @@ import AppKit
 import ApplicationServices
 
 enum Client: String, CaseIterable, Identifiable {
-    case chatgpt, grok, muse
+    case chatgpt, grok, muse, claude
     var id: String { rawValue }
-    var name: String { switch self { case .chatgpt: return "ChatGPT"; case .grok: return "Grok Bot"; case .muse: return "Muse" } }
-    var bundleID: String { switch self { case .chatgpt: return "com.openai.codex"; case .grok: return "com.anysphere.sand"; case .muse: return "com.meta.endo" } }
-    var mark: String { switch self { case .chatgpt: return "✳"; case .grok: return "／"; case .muse: return "m" } }
+    var name: String { switch self { case .chatgpt: return "ChatGPT"; case .grok: return "Grok Bot"; case .muse: return "Muse"; case .claude: return "Claude" } }
+    var bundleID: String { switch self { case .chatgpt: return "com.openai.codex"; case .grok: return "com.anysphere.sand"; case .muse: return "com.meta.endo"; case .claude: return "com.anthropic.claudefordesktop" } }
+    var mark: String { switch self { case .chatgpt: return "✳"; case .grok: return "／"; case .muse: return "m"; case .claude: return "✷" } }
     var spriteName: String { self == .grok ? "pet-grok-glossy" : "pet-\(rawValue)" }
-    var characterName: String { switch self { case .chatgpt: return "dot"; case .grok: return "Bot"; case .muse: return "Muse" } }
+    var characterName: String { switch self { case .chatgpt: return "dot"; case .grok: return "Bot"; case .muse: return "Muse"; case .claude: return "Claude" } }
     var applicationURL: URL? { NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) }
 }
 
@@ -36,7 +36,7 @@ enum DeliveryRules {
     }
     static func isComposer(_ descriptor: String) -> Bool {
         let d = descriptor.lowercased()
-        return ["message", "prompt", "ask anything", "ask grok", "ask chatgpt", "ask muse", "chat input", "composer", "发消息", "发送消息", "输入消息", "消息输入", "询问", "提问", "输入指令", "任务描述"].contains { d.contains($0) }
+        return ["message", "prompt", "ask anything", "ask grok", "ask chatgpt", "ask muse", "ask claude", "chat input", "composer", "发消息", "发送消息", "输入消息", "消息输入", "询问", "提问", "输入指令", "任务描述"].contains { d.contains($0) }
     }
     static func newChatURL(_ text: String) -> URL? {
         var parts = URLComponents()

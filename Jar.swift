@@ -4,6 +4,12 @@ import AppKit
 enum JarGeometry {
     static let size = NSSize(width: 260, height: 260)
     static let sceneRect = NSRect(x: 25, y: 42, width: 210, height: 210)
+    static let claudePlacement = NSRect(x: 0.55, y: 0.74, width: 0.40, height: 0.24)
+    static var claudeRect: NSRect {
+        NSRect(x: sceneRect.minX + claudePlacement.minX * sceneRect.width,
+               y: sceneRect.maxY - claudePlacement.maxY * sceneRect.height,
+               width: claudePlacement.width * sceneRect.width, height: claudePlacement.height * sceneRect.height)
+    }
     static let frames = Dictionary(uniqueKeysWithValues: Client.allCases.map { ($0, PackedSceneRegion(client: $0).frame) })
     static let mouth = NSRect(x: 17, y: 234, width: 226, height: 24)
     // Fit the glass to the existing pile: narrower walls and a raised floor.
@@ -139,7 +145,12 @@ final class JarGlassView: NSView {
 final class PetJarView: NSView {
     var characters: [Client: CharacterView] = [:]
     var selected: Client?
-    var chosen: ((Client) -> Void)?, moved: (() -> Void)?
+    var chosen: ((Client) -> Void)?, opened: ((Client) -> Void)?, moved: (() -> Void)?
+    private var lastClick: Client?
+    private let quotaStore = AccountUsageStore()
+    private let usagePopover = NSPopover()
+    private let usageLabel = NSTextField(wrappingLabelWithString: "")
+    private var usageRefreshedAt = Date.distantPast
     var startMouse = NSPoint.zero, startWindow = NSPoint.zero
     var dragged = false
     private var hoverTracking: NSTrackingArea?
@@ -147,7 +158,7 @@ final class PetJarView: NSView {
     // Used only by local visual QA; ordinary launches always follow the real pointer.
     var previewHover: Client?
     private(set) var hoveredClient: Client?
-    let hint = NSTextField(labelWithString: "点一只，聊两句")
+    let hint = NSTextField(labelWithString: "双击打开 · 悬停看额度")
     override init(frame: NSRect) {
         super.init(frame: frame); wantsLayer = true; addSubview(JarBackView(frame: bounds))
         let contents = JarContentsView(frame: bounds); addSubview(contents)
@@ -155,7 +166,10 @@ final class PetJarView: NSView {
         for client in Client.allCases { let character = CharacterView(client: client, frame: JarGeometry.frames[client]!); character.jar = self; contents.addSubview(character); characters[client] = character }
         addSubview(JarGlassView(frame: bounds))
         hint.frame = NSRect(x: 25, y: 3, width: 210, height: 16); hint.alignment = .center; hint.font = .systemFont(ofSize: 10, weight: .medium); hint.textColor = .secondaryLabelColor; addSubview(hint)
-        toolTip = "宠物罐 · 点击角色说话，拖动罐子换位置"
+        let controller = NSViewController(); controller.view = NSView(frame: NSRect(x: 0, y: 0, width: 284, height: 180))
+        usageLabel.font = .systemFont(ofSize: 11); usageLabel.isSelectable = false
+        controller.view.addSubview(usageLabel); usagePopover.contentViewController = controller
+        usagePopover.behavior = .applicationDefined; usagePopover.animates = false
     }
     required init?(coder: NSCoder) { fatalError() }
     deinit { hoverTimer?.invalidate() }
@@ -195,20 +209,44 @@ final class PetJarView: NSView {
     }
     func updateHover(at point: NSPoint?) {
         let next = point.flatMap { character(at: $0)?.client }
-        guard hoveredClient != next else { return }
+        guard hoveredClient != next else {
+            if let next, Date().timeIntervalSince(usageRefreshedAt) > 45 { showQuota(next) }; return
+        }
         if let previous = hoveredClient { characters[previous]?.setHovered(false) }
         hoveredClient = next
         if let next { characters[next]?.setHovered(true); NSCursor.pointingHand.set() } else { NSCursor.arrow.set() }
-        hint.stringValue = next?.name ?? selected?.name ?? "点一只，聊两句"
+        hint.stringValue = next?.name ?? selected?.name ?? "双击打开 · 悬停看额度"
+        usagePopover.close()
+        if let next { showQuota(next) }
     }
     override func mouseEntered(with event: NSEvent) { mouseMoved(with: event) }
     override func mouseMoved(with event: NSEvent) { if !dragged { updateHover(at: convert(event.locationInWindow, from: nil)) } }
     override func mouseExited(with event: NSEvent) { updateHover(at: nil) }
     func choose(_ client: Client) { chosen?(client) }
+    func open(_ client: Client) { usagePopover.close(); opened?(client) }
+    func finishClick(_ client: Client, count: Int) {
+        if count == 2, lastClick == client { lastClick = nil; open(client) } else { lastClick = client }
+    }
+    private func showQuota(_ client: Client) {
+        guard window?.isVisible == true else { return }
+        usageRefreshedAt = Date()
+        func display(_ text: String) {
+            usageLabel.stringValue = client.name + " · 账号额度\n\n" + text + "\n\n双击打开客户端"
+            let height = min(430, usageLabel.cell!.cellSize(forBounds: NSRect(x: 0, y: 0, width: 256, height: 1000)).height + 28)
+            usagePopover.contentSize = NSSize(width: 284, height: height)
+            usageLabel.frame = NSRect(x: 14, y: 14, width: 256, height: height - 28)
+            if !usagePopover.isShown { usagePopover.show(relativeTo: JarGeometry.frames[client]!, of: self, preferredEdge: .minX) }
+        }
+        display("正在读取账号额度…")
+        quotaStore.load(client) { [weak self] snapshot in
+            guard let self, self.hoveredClient == client, self.window?.isVisible == true else { return }
+            display(snapshot.text)
+        }
+    }
     func setActive(_ client: Client?) {
         selected = client
         for (key, character) in characters { character.selected = key == client }
-        if let client { characters[client]?.react(); hint.stringValue = client.name } else { hint.stringValue = "点一只，聊两句" }
+        if let client { characters[client]?.react(); hint.stringValue = client.name } else { hint.stringValue = "双击打开 · 悬停看额度" }
     }
     func beginDrag() { startMouse = NSEvent.mouseLocation; startWindow = window?.frame.origin ?? .zero; dragged = false }
     func continueDrag() {
@@ -216,12 +254,12 @@ final class PetJarView: NSView {
         if abs(dx) + abs(dy) > 4 { dragged = true; updateHover(at: nil) }; guard dragged else { return }
         window?.setFrameOrigin(NSPoint(x: startWindow.x + dx, y: startWindow.y + dy)); moved?()
     }
-    func endDrag() { clamp(); moved?(); dragged = false }
+    func endDrag() { lastClick = nil; clamp(); moved?(); dragged = false }
     func clamp() {
         guard let window, let screen = NSScreen.screens.first(where: { $0.frame.intersects(window.frame) }) ?? NSScreen.main else { return }
         let r = screen.visibleFrame; window.setFrameOrigin(NSPoint(x: min(max(window.frame.minX, r.minX), r.maxX - window.frame.width), y: min(max(window.frame.minY, r.minY), r.maxY - window.frame.height)))
     }
-    override func mouseDown(with event: NSEvent) { beginDrag() }
+    override func mouseDown(with event: NSEvent) { lastClick = nil; beginDrag() }
     override func mouseDragged(with event: NSEvent) { continueDrag() }
     override func mouseUp(with event: NSEvent) { if dragged { endDrag() } }
     override func rightMouseDown(with event: NSEvent) {

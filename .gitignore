@@ -3,3 +3,6 @@
 dist/
 *.xcuserstate
 xcuserdata/
+**/bin/
+**/obj/
+.vs/

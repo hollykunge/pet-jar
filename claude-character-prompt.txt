@@ -1,0 +1,8 @@
+Asset: Resources/pet-claude.png
+Method: built-in image_gen, transparent_background=true.
+Reference: Resources/pet-muse.png, material and lighting only.
+Provenance: original generated illustration, not an official downloaded mascot.
+Prepared native eye assets: Resources/claude-eye-*-{face,open,closed}.png and Resources/claude-eyes.json.
+Regenerate prepared eye assets from project-local inputs with PetJar.exe --export-claude-eyes <Resources directory>.
+
+Use case: stylized-concept. Asset type: transparent PNG sprite for an existing native desktop pet jar, not a webpage or mockup. Create ONE Claude-inspired warm terracotta-orange small crab pet, front view, friendly chunky rounded body, two little raised pincer hands at its sides and four short rounded feet. Compact silhouette slightly wider than tall, small cute glossy BLACK oval eyes directly on the front of the orange body, a very small subtle smile, no eye stalks. Style: premium tactile 3D collectible toy, softly flocked velvet/suede terracotta material, tasteful fine fibers, gentle studio lighting from upper left, consistent with the supplied cream plush pet reference but clearly a different crab character. Image 1 is a MATERIAL AND LIGHTING STYLE REFERENCE only; do not copy its hood or cream body. Put both eyes at the same height, near x=42% and 58%, y=43% of the sprite canvas, clearly separated, no glasses, no eyebrows, no text, no letters, no logo, no extra pets, no scenery, no jar, no cast shadow outside the character. Center whole character including every claw and foot with about 6% transparent padding. Actual transparent alpha background. Full-body isolated sprite, polished final game asset. This is an original illustrative pet, not an official downloaded mascot.

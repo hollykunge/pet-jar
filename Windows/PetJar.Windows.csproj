@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <AssemblyName>PetJar</AssemblyName>
+    <RootNamespace>PetJar</RootNamespace>
+    <Version>0.5.3</Version>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- WPF owns DPI awareness; WinForms is used only for the notification icon. -->
+    <NoWarn>$(NoWarn);WFAC010</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="../Resources/pile-*.png" Link="Resources/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="../Resources/pet-chatgpt.png;../Resources/pet-grok-glossy.png;../Resources/pet-muse.png;../Resources/pet-claude.png" Link="Resources/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="SceneLayout.json" />
+  </ItemGroup>
+</Project>
