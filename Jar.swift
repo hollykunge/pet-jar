@@ -144,8 +144,7 @@ final class JarGlassView: NSView {
 
 final class PetJarView: NSView {
     var characters: [Client: CharacterView] = [:]
-    var selected: Client?
-    var chosen: ((Client) -> Void)?, opened: ((Client) -> Void)?, moved: (() -> Void)?
+    var opened: ((Client) -> Void)?, moved: (() -> Void)?
     private var lastClick: Client?
     private let quotaStore = AccountUsageStore()
     private let usagePopover = NSPopover()
@@ -215,14 +214,13 @@ final class PetJarView: NSView {
         if let previous = hoveredClient { characters[previous]?.setHovered(false) }
         hoveredClient = next
         if let next { characters[next]?.setHovered(true); NSCursor.pointingHand.set() } else { NSCursor.arrow.set() }
-        hint.stringValue = next?.name ?? selected?.name ?? "双击打开 · 悬停看额度"
+        hint.stringValue = next?.name ?? "双击打开 · 悬停看额度"
         usagePopover.close()
         if let next { showQuota(next) }
     }
     override func mouseEntered(with event: NSEvent) { mouseMoved(with: event) }
     override func mouseMoved(with event: NSEvent) { if !dragged { updateHover(at: convert(event.locationInWindow, from: nil)) } }
     override func mouseExited(with event: NSEvent) { updateHover(at: nil) }
-    func choose(_ client: Client) { chosen?(client) }
     func open(_ client: Client) { usagePopover.close(); opened?(client) }
     func finishClick(_ client: Client, count: Int) {
         if count == 2, lastClick == client { lastClick = nil; open(client) } else { lastClick = client }
@@ -243,11 +241,6 @@ final class PetJarView: NSView {
             display(snapshot.text)
         }
     }
-    func setActive(_ client: Client?) {
-        selected = client
-        for (key, character) in characters { character.selected = key == client }
-        if let client { characters[client]?.react(); hint.stringValue = client.name } else { hint.stringValue = "双击打开 · 悬停看额度" }
-    }
     func beginDrag() { startMouse = NSEvent.mouseLocation; startWindow = window?.frame.origin ?? .zero; dragged = false }
     func continueDrag() {
         let p = NSEvent.mouseLocation, dx = p.x - startMouse.x, dy = p.y - startMouse.y
@@ -264,8 +257,8 @@ final class PetJarView: NSView {
     override func mouseUp(with event: NSEvent) { if dragged { endDrag() } }
     override func rightMouseDown(with event: NSEvent) {
         let menu = NSMenu()
-        for (index, client) in Client.allCases.enumerated() { let item = NSMenuItem(title: "和 \(client.name) 说话", action: #selector(pickFromMenu(_:)), keyEquivalent: ""); item.tag = index; item.target = self; menu.addItem(item) }
+        for (index, client) in Client.allCases.enumerated() { let item = NSMenuItem(title: "打开 \(client.name)", action: #selector(openFromMenu(_:)), keyEquivalent: ""); item.tag = index; item.target = self; menu.addItem(item) }
         menu.addItem(.separator()); menu.addItem(withTitle: "退出宠物罐", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"); NSMenu.popUpContextMenu(menu, with: event, for: self)
     }
-    @objc func pickFromMenu(_ item: NSMenuItem) { choose(Client.allCases[item.tag]) }
+    @objc func openFromMenu(_ item: NSMenuItem) { open(Client.allCases[item.tag]) }
 }

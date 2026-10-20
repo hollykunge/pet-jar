@@ -13,13 +13,13 @@ internal sealed class EyelidVisual : ContainerVisual
     private const double ShutSeam=.72;
     private readonly EyeSurface open,closed;
     private readonly bool originallyClosed;
-    internal EyelidVisual(Client client,Rect eye)
+    internal EyelidVisual(Client client,Rect eye,Rect? spriteFrame=null)
     {
         originallyClosed=client==Client.ChatGPT;
-        Clip=new CombinedGeometry(GeometryCombineMode.Intersect,JarGeometry.Interior,JarGeometry.Regions[client]);
+        if(spriteFrame==null)Clip=new CombinedGeometry(GeometryCombineMode.Intersect,JarGeometry.Interior,JarGeometry.Regions[client]);
         OpacityMask=new RadialGradientBrush {
             GradientStops=new GradientStopCollection {new(Colors.White,0),new(Colors.White,.92),new(Colors.Transparent,1)} };
-        var art=EyeArtwork.For(client,eye);
+        var art=spriteFrame is Rect frame?EyeArtwork.ForSprite(client,eye,frame):EyeArtwork.For(client,eye);
         var face=new DrawingVisual();using(var dc=face.RenderOpen())dc.DrawImage(art.Face,eye);Children.Add(face);
         open=new EyeSurface(art.Open,art.OpenRect);
         closed=new EyeSurface(art.Closed,art.ClosedRect);

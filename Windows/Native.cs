@@ -20,8 +20,6 @@ internal static class Native
         try {Marshal.ThrowExceptionForHR(((IApplicationActivationManager)manager).ActivateApplication(appUserModelId,"",2,out _));}
         finally {Marshal.FinalReleaseComObject(manager);}
     }
-    [DllImport("user32.dll")] internal static extern bool RegisterHotKey(IntPtr window,int id,uint modifiers,uint key);
-    [DllImport("user32.dll")] internal static extern bool UnregisterHotKey(IntPtr window,int id);
     [DllImport("user32.dll")] internal static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] internal static extern bool SetForegroundWindow(IntPtr window);
     [DllImport("user32.dll")] internal static extern bool ShowWindow(IntPtr window,int command);
@@ -31,17 +29,6 @@ internal static class Native
     [DllImport("user32.dll",CharSet=CharSet.Unicode)] private static extern int GetWindowText(IntPtr window,StringBuilder text,int count);
     private delegate bool WindowCallback(IntPtr window,IntPtr parameter);
     [DllImport("user32.dll")] private static extern bool EnumWindows(WindowCallback callback,IntPtr parameter);
-    [DllImport("user32.dll")] private static extern uint SendInput(uint count,INPUT[] inputs,int size);
-    [StructLayout(LayoutKind.Sequential)] private struct INPUT { public uint type; public INPUTUNION data; }
-    [StructLayout(LayoutKind.Explicit)] private struct INPUTUNION
-    {
-        [FieldOffset(0)] public KEYBDINPUT keyboard;
-        [FieldOffset(0)] public MOUSEINPUT mouse;
-    }
-    [StructLayout(LayoutKind.Sequential)] private struct KEYBDINPUT
-    { public ushort key,scan; public uint flags,time; public UIntPtr extra; }
-    [StructLayout(LayoutKind.Sequential)] private struct MOUSEINPUT
-    { public int x,y; public uint mouseData,flags,time; public UIntPtr extra; }
     internal sealed record Target(IntPtr Handle,string Title,string Executable);
     internal static List<Target> Windows()
     {
@@ -62,14 +49,7 @@ internal static class Native
         },IntPtr.Zero);
         return targets;
     }
-    internal static List<Target> Matching(string path,string title) => Windows().FindAll(target =>
-        string.Equals(Path.GetFullPath(target.Executable),Path.GetFullPath(path),StringComparison.OrdinalIgnoreCase)
-        && (title.Length==0 || target.Title.Contains(title,StringComparison.OrdinalIgnoreCase)));
-    internal static bool Paste()
-    {
-        static INPUT Key(ushort key,bool up) => new() { type=1, data=new() { keyboard=new() { key=key,flags=up?2u:0u } } };
-        // Never synthesize Enter. Only paste into a separately verified editor.
-        var inputs=new[] { Key(0x11,false),Key(0x56,false),Key(0x56,true),Key(0x11,true) };
-        return SendInput(4,inputs,Marshal.SizeOf<INPUT>())==4;
-    }
+    internal static List<Target> Matching(string path) => Windows().FindAll(target =>
+        string.Equals(Path.GetFullPath(target.Executable),Path.GetFullPath(path),StringComparison.OrdinalIgnoreCase));
+
 }

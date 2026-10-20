@@ -8,7 +8,7 @@ run:
 	powershell -NoProfile -File ./build.ps1 -Run
 
 test:
-	powershell -NoProfile -File ./build.ps1 -DeliveryTest
+	powershell -NoProfile -File ./build.ps1
 
 package:
 	powershell -NoProfile -File ./build.ps1 -Package

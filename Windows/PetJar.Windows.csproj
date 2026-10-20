@@ -8,13 +8,19 @@
     <AssemblyName>PetJar</AssemblyName>
     <RootNamespace>PetJar</RootNamespace>
     <Version>0.5.3</Version>
+    <Optimize>true</Optimize>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <!-- WPF owns DPI awareness; WinForms is used only for the notification icon. -->
     <NoWarn>$(NoWarn);WFAC010</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <EmbeddedResource Include="../Resources/pile-*.png" Link="Resources/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="../Resources/prop-*.png" Link="Resources/%(Filename)%(Extension)" />
     <EmbeddedResource Include="../Resources/pet-chatgpt.png;../Resources/pet-grok-glossy.png;../Resources/pet-muse.png;../Resources/pet-claude.png" Link="Resources/%(Filename)%(Extension)" />
     <EmbeddedResource Include="SceneLayout.json" />
+    <None Include="../THIRD-PARTY-NOTICES.txt" Link="THIRD-PARTY-NOTICES.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Box2D.NetStandard" Version="[2.4.7-alpha]" />
   </ItemGroup>
 </Project>

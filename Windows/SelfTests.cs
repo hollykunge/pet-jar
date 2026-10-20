@@ -2,12 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Text;
+using System.Linq;
 using System.Text.Json;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Automation;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
@@ -18,25 +16,15 @@ internal static class SelfTests
     private static void Check(bool value,string message) {if(!value)throw new InvalidOperationException(message);}
     internal static void Run()
     {
+        PhysicsTests.Run();
+        JarMotionTests.Run();
+        MaterialSquashTests.Run();
         InteractionQuotaTests.Run();
-        var text="请总结 A&B + C? #宠物罐\n你好 👋 https://example.com?q=a&b=2";
-        Check(Uri.UnescapeDataString(DeliveryRules.NewChatUrl(text).Split("?prompt=")[1])==text,"Unicode/URL round trip");
-        Check(!DeliveryRules.Valid(" \n\t") && !DeliveryRules.Valid(new string('中',34000)) && DeliveryRules.Valid(text),"input size guards");
-        Check(DeliveryRules.IsSend("发送消息") && !DeliveryRules.IsSend("Send feedback"),"send button semantics");
-        Check(!DeliveryRules.CanInsert("已有草稿","Message your dot",false),"nonempty target draft must be preserved");
-        Check(!DeliveryRules.CanInsert("","Search messages",false),"search field cannot receive messages");
-        Check(!DeliveryRules.CanInsert("","Message",true) && DeliveryRules.CanInsert("","Message your dot",false),"editable semantics");
-        var model=new PetModel();
-        foreach(var client in Enum.GetValues<Client>()) {Check(model.Select(client),"selection");Check(model.Draft=="","isolated initial draft");model.Draft=client.Name()+text;model.Mode=client==Client.Grok?DeliveryMode.Fill:DeliveryMode.Copy;}
-        foreach(var client in Enum.GetValues<Client>()) {model.Select(client);Check(model.Draft==client.Name()+text,"independent draft restore");Check(model.Mode==(client==Client.Grok?DeliveryMode.Fill:DeliveryMode.Copy),"independent modes");}
-        var completion=new TaskCompletionSource<DeliveryResult>();model.Select(Client.Grok);
-        Client? recipient=null;string? payload=null;
-        var sending=model.SendAsync((client,draft,mode)=>{recipient=client;payload=draft;return completion.Task;});
-        Check(model.Busy && !model.Select(Client.Muse),"recipient lock during delivery");model.Draft="overwrite";model.Mode=DeliveryMode.Send;
-        Check(model.Draft==Client.Grok.Name()+text && model.Mode==DeliveryMode.Fill,"editing and mode locked during delivery");
-        completion.SetResult(new("filled",Inserted:true));sending.GetAwaiter().GetResult();
-        Check(!model.Busy && recipient==Client.Grok && payload==Client.Grok.Name()+text && model.Result?.Inserted==true,"captured target and completion");
-        Check(!model.Result!.ServerReceived && model.Draft==payload,"source draft retained, receipt never invented");
+        CollectionTests.Run();
+        FillerSelectionTests.Run();
+        QuotaCardTests.Run();
+        foreach(var retired in new[] {"ComposerWindow","DesktopDelivery","PetModel","DeliveryRules","DeliveryResult"})
+            Check(typeof(SelfTests).Assembly.GetType("PetJar."+retired)==null,"retired message feature must not ship: "+retired);
         var legacy=JsonSerializer.Deserialize<Settings>("{\"Executables\":{\"ChatGPT\":\"old-chatgpt.exe\",\"Grok\":\"old-grok.exe\",\"Muse\":\"old-muse.exe\"}}")!;
         legacy.Executables[Client.Claude]="selected-claude.exe";
         var restored=JsonSerializer.Deserialize<Settings>(JsonSerializer.Serialize(legacy))!;
@@ -65,8 +53,7 @@ internal static class SelfTests
         {
             _=Art.Image(client.Sprite());var eyes=new List<Rect>(JarGeometry.Eyes(client));
             foreach(var eye in eyes)Check(JarGeometry.Interior.FillContains(eye.TopLeft)&&JarGeometry.Interior.FillContains(eye.BottomRight),"eyes inside cavity");
-            var changed=Render(client);var chattingFrame=Render(client,true);
-            Check(changed.AsSpan().SequenceEqual(chattingFrame),"active chat uses the same eye-only scene geometry: "+client);
+            var changed=Render(client);
             int differences=0;
             for(int y=0;y<520;y++)for(int x=0;x<520;x++)
             {
@@ -77,30 +64,22 @@ internal static class SelfTests
             Check(differences>20,"eye patch must visibly change: "+client);
         }
         var pet=new PetWindow(new Settings()) {FreezeExpression=true};
+        int opened=0;pet.OpenRequested+=_=>opened++;
+        foreach(var button in ((Canvas)pet.Content).Children.OfType<Button>())button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Check(opened==0,"a generic button click cannot bypass the double-click gesture");
         foreach(var client in Enum.GetValues<Client>()) {pet.SetHover(client);Check(pet.Drawing.GetEyes(client)==new EyePose(1,1) && pet.Drawing.Hovered==client,"exclusive hover");}
         pet.SetHover(null);foreach(var client in Enum.GetValues<Client>())Check(pet.Drawing.GetEyes(client)==default,"frozen idle has no animation");
-        pet.SetActive(Client.Grok);pet.SetHover(Client.Muse);pet.SetHover(null);
-        Check(pet.Drawing.Selected==Client.Grok && pet.Drawing.GetEyes(Client.Grok)==new EyePose(1,1) && pet.Drawing.GetEyes(Client.Muse)==default,"chatting expression survives pointer leaving the jar");
-        pet.SetActive(Client.Muse);Check(pet.Drawing.Selected==Client.Muse,"chatting target switches exclusively");
-        pet.SetActive(null);Check(pet.Drawing.Selected==null && pet.Drawing.GetEyes(Client.Muse)==default,"dismissal clears chatting expression");pet.Close();
+        pet.Close();
         TestAnimation();
-        var work=new Rect(0,0,1920,1040);var jar=new Rect(900,400,260,260);var composerSize=new Size(352,176);
-        var first=ComposerPlacement.At(jar,new Point(99,63),composerSize,work);
-        var second=ComposerPlacement.At(jar,new Point(99,88),composerSize,work);
-        Check(Math.Abs(second.Y-first.Y-25)<.01 && first.X+composerSize.Width<jar.Left,"composer follows actual clicks without obscuring the jar");
-        var flipped=ComposerPlacement.At(new Rect(0,0,260,260),new Point(99,5),composerSize,work);
-        Check(flipped.X>=272 && flipped.Y>=ComposerWindow.AvatarOverlap,"left edge flips placement and top edge preserves the exposed avatar");
-        var bottom=ComposerPlacement.At(new Rect(1660,780,260,260),new Point(101,220),composerSize,work);
-        Check(bottom.Y+composerSize.Height<=work.Bottom,"bottom edge keeps the full composer visible");
     }
-    private static RenderTargetBitmap Bitmap(Client? client,bool chatting=false)
+    private static RenderTargetBitmap Bitmap(Client? client)
     {
-        var drawing=new JarDrawing {Width=260,Height=260,ShowHint=false,Hovered=chatting?null:client,Selected=chatting?client:null};
+        var drawing=new JarDrawing {Width=260,Height=260,ShowHint=false,Hovered=client};
         if(client is Client targetClient)drawing.SetEyes(targetClient,new(1,1));
         drawing.Measure(new(260,260));drawing.Arrange(new(0,0,260,260));drawing.UpdateLayout();
         var target=new RenderTargetBitmap(520,520,192,192,PixelFormats.Pbgra32);target.Render(drawing);return target;
     }
-    private static byte[] Render(Client? client,bool chatting=false) {var target=Bitmap(client,chatting);var pixels=new byte[520*520*4];target.CopyPixels(pixels,520*4,0);return pixels;}
+    private static byte[] Render(Client? client) {var target=Bitmap(client);var pixels=new byte[520*520*4];target.CopyPixels(pixels,520*4,0);return pixels;}
     internal static void RenderToFile(Client? client,string path)
     {var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(Bitmap(client)));using var file=File.Create(path);encoder.Save(file);}
 
@@ -196,7 +175,7 @@ internal static class SelfTests
                 Check(Math.Abs(pose.Left-previous.Left)<.04&&Math.Abs(pose.Right-previous.Right)<.04,"continuous eye timeline including cycle boundaries");
                 min=Math.Min(min,pose.Left);max=Math.Max(max,pose.Left);previous=pose;
             }
-            Check(max-min>.7,"each pet animates in idle, hover and chat");
+            Check(max-min>.7,"each pet animates in idle and hover");
             var animator=new EyeAnimator(client);
             foreach(var time in new[] {1.53,1.56,1.58,1.63,1.71,1.77,2.2}) {
                 var before=animator.At(time);animator.SetMood(mood,time);
@@ -206,8 +185,6 @@ internal static class SelfTests
             Check(EyeExpression.Sample(client,2,mood,true)==(mood==EyeMood.Idle?default:new EyePose(1,1)),"reduced motion uses static eyes");
         }
         Check(EyeExpression.Sample(Client.Grok,1.15,EyeMood.Hover).Right>.9 && EyeExpression.Sample(Client.Grok,1.15,EyeMood.Hover).Left==0,"hover wink changes one eye");
-        Check(EyeExpression.Sample(Client.Muse,.58,EyeMood.Chatting).Left>.9,"chat entry includes a second blink");
-        Check(EyeExpression.Sample(Client.ChatGPT,1,EyeMood.Chatting)==new EyePose(1,1),"yellow pet stays attentive while chatting");
     }
 
     // Opt-in native-window diagnostics. Callback timing describes compositor
@@ -235,72 +212,4 @@ internal static class SelfTests
         pet.Closed+=(_,_)=>Stop();CompositionTarget.Rendering+=Sample;timer.Start();
     }
 
-    internal static Window Fixture(string mode)
-    {
-        var window=new Window {Title="PetJar local delivery fixture",Width=480,Height=260,WindowStartupLocation=WindowStartupLocation.CenterScreen};
-        var panel=new StackPanel {Margin=new(20)};var box=new TextBox {Text=mode=="nonempty"?"原有目标草稿，请勿覆盖":"",AcceptsReturn=true,Height=90};
-        System.Windows.Automation.AutomationProperties.SetName(box,"Message your dot");panel.Children.Add(box);
-        if(mode=="ambiguous") {var second=new TextBox();System.Windows.Automation.AutomationProperties.SetName(second,"Message another conversation");panel.Children.Add(second);}
-        var send=new Button {Content="Send message",Height=30,Focusable=false};
-        send.Click+=(_,_)=>{box.Text="";send.Content="Fixture send invoked";};
-        if(mode!="no-button")panel.Children.Add(send);
-        var group=new GroupBox {Header="Conversation",Content=panel,Focusable=true};window.Content=group;
-        // Ambiguous case must not resolve via a focused composer.
-        if(mode=="ambiguous")window.Loaded+=(_,_)=>window.Dispatcher.BeginInvoke(()=>group.Focus());else window.Loaded+=(_,_)=>box.Focus();
-        return window;
-    }
-    internal static async Task TestDelivery()
-    {
-        var exe=Environment.ProcessPath!;
-        foreach(var scenario in new[] {"empty","nonempty","ambiguous","no-button"})
-        {
-            var start=new ProcessStartInfo(exe) {UseShellExecute=false};start.ArgumentList.Add("--delivery-fixture");start.ArgumentList.Add(scenario);
-            using var fixture=Process.Start(start)!;
-            try
-            {
-                for(int i=0;i<30;i++) {fixture.Refresh();if(fixture.MainWindowHandle!=IntPtr.Zero)break;await Task.Delay(100);}
-                var settings=new Settings();settings.Executables[Client.ChatGPT]=exe;settings.WindowTitles[Client.ChatGPT]="PetJar local delivery fixture";
-                var delivery=new DesktopDelivery(settings);var text="仅本地测试 A&B 👋\n第二行";
-                if(scenario=="empty")
-                {
-                    var copy=await delivery.Deliver(Client.ChatGPT,text,DeliveryMode.Copy);
-                    Check(copy.Copied&&copy.Opened&&!copy.Inserted&&!copy.SendClicked&&!copy.ServerReceived,"copy/open fixture: "+copy.Message);
-                    var filled=await delivery.Deliver(Client.ChatGPT,text,DeliveryMode.Fill);
-                    Check(filled.Inserted&&!filled.SendClicked&&!filled.ServerReceived,"fill fixture: "+filled.Message);
-                    var refusal=await delivery.Deliver(Client.ChatGPT,"不能覆盖",DeliveryMode.Send);
-                    Check(!refusal.Inserted&&!refusal.SendClicked,"second nonempty send refused");
-                }
-                else if(scenario=="no-button")
-                {
-                    var result=await delivery.Deliver(Client.ChatGPT,text,DeliveryMode.Send);
-                    Check(result.Inserted&&!result.SendClicked,"missing send button must stop after insertion: "+result.Message);
-                }
-                else
-                {
-                    var result=await delivery.Deliver(Client.ChatGPT,text,DeliveryMode.Send);
-                    Check(!result.Inserted&&!result.SendClicked,"must refuse "+scenario+": "+result.Message);
-                    if(scenario=="nonempty")
-                    {
-                        var root=AutomationElement.FromHandle(fixture.MainWindowHandle);
-                        var editor=root.FindFirst(TreeScope.Descendants,new PropertyCondition(AutomationElement.ControlTypeProperty,ControlType.Edit));
-                        Check(((ValuePattern)editor.GetCurrentPattern(ValuePattern.Pattern)).Current.Value=="原有目标草稿，请勿覆盖","original target draft was changed");
-                    }
-                }
-            }
-            finally {if(!fixture.HasExited) {fixture.Kill();await fixture.WaitForExitAsync();}}
-        }
-        var sendStart=new ProcessStartInfo(exe) {UseShellExecute=false};sendStart.ArgumentList.Add("--delivery-fixture");sendStart.ArgumentList.Add("empty");
-        using var sendFixture=Process.Start(sendStart)!;
-        try
-        {
-            for(int i=0;i<30;i++){sendFixture.Refresh();if(sendFixture.MainWindowHandle!=IntPtr.Zero)break;await Task.Delay(100);}
-            var settings=new Settings();settings.Executables[Client.ChatGPT]=exe;settings.WindowTitles[Client.ChatGPT]="PetJar local delivery fixture";
-            var result=await new DesktopDelivery(settings).Deliver(Client.ChatGPT,"只在本地 fixture 点击发送",DeliveryMode.Send);
-            Check(result.Inserted&&result.SendClicked&&!result.ServerReceived,"native send invoke: "+result.Message);
-            await Task.Delay(100);
-            var root=AutomationElement.FromHandle(sendFixture.MainWindowHandle);
-            Check(root.FindFirst(TreeScope.Descendants,new PropertyCondition(AutomationElement.NameProperty,"Fixture send invoked"))!=null,"send click did not reach native fixture");
-        }
-        finally {if(!sendFixture.HasExited){sendFixture.Kill();await sendFixture.WaitForExitAsync();}}
-    }
 }

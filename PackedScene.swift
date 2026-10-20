@@ -156,7 +156,6 @@ final class CharacterView: NSView {
     let region: PackedSceneRegion
     let face: FacialExpressionView
     weak var jar: PetJarView?
-    var selected = false
     // Deterministic visual QA only; ordinary launches animate short blinks.
     var freezeExpression = false
     private(set) var hovering = false
@@ -212,11 +211,6 @@ final class CharacterView: NSView {
             self.face.strength = resting == 1 ? 1 - eased : eased
         }
         expressionTimer = timer; RunLoop.main.add(timer,forMode: .common)
-    }
-    func react() {
-        guard !freezeExpression, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
-        if hovering { blink(); return }
-        animateEyes(resting: 0,duration: client == .chatgpt ? 0.65 : 0.34)
     }
     override func mouseMoved(with event: NSEvent) { jar?.mouseMoved(with: event) }
     override func mouseDown(with event: NSEvent) { jar?.beginDrag() }

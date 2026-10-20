@@ -22,9 +22,9 @@ internal static class InteractionQuotaTests
             Check(bindings.Executables[Client.Claude]==manual&&!bindings.AutoBindings.ContainsKey(Client.Claude),"existing manual selection is retained");
             Check(bindings.AppUserModelIds[Client.ChatGPT].EndsWith("!App"),"package identity is retained for cold launch");
             var updated=new[] {new InstalledClient(Client.ChatGPT,"updated-version.exe","test","OpenAI.Codex_2p2nqsd0c76g0!App")};
-            bindings.WindowTitles[Client.ChatGPT]="keep conversation";bindings.QuotaSources[Client.ChatGPT]=QuotaSource.Unavailable;
+            bindings.QuotaSources[Client.ChatGPT]=QuotaSource.Unavailable;
             Check(ClientDiscovery.Apply(bindings,updated)&&bindings.Executables[Client.ChatGPT]=="updated-version.exe","automatic binding refreshes after package upgrade");
-            Check(bindings.WindowTitles[Client.ChatGPT]=="keep conversation"&&bindings.QuotaSources[Client.ChatGPT]==QuotaSource.Unavailable,"automatic refresh preserves title and quota preferences");
+            Check(bindings.QuotaSources[Client.ChatGPT]==QuotaSource.Unavailable,"automatic refresh preserves quota preferences");
             Check(!bindings.Executables.ContainsKey(Client.Muse),"undetected client stays unbound");
         }finally {File.Delete(manual);}
         var click=new PetClickGesture();
