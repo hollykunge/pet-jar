@@ -11,6 +11,7 @@ namespace PetJar;
 internal sealed class EyeArtwork
 {
     private static readonly Dictionary<(Client,Rect),EyeArtwork> cache=new();
+    private static readonly Dictionary<(Client,Rect),EyeArtwork> spriteCache=new();
     internal BitmapSource Face {get;}
     internal BitmapSource Open {get;}
     internal BitmapSource Closed {get;}
@@ -21,12 +22,18 @@ internal sealed class EyeArtwork
         if(!cache.TryGetValue((client,eye),out var art))cache[(client,eye)]=art=new(client,eye);
         return art;
     }
-    private EyeArtwork(Client client,Rect eye)
+    internal static EyeArtwork ForSprite(Client client,Rect eye,Rect frame)
     {
-        bool nativeLid=client==Client.Claude;
+        if(!spriteCache.TryGetValue((client,eye),out var art))spriteCache[(client,eye)]=art=new(client,eye,frame);
+        return art;
+    }
+    private EyeArtwork(Client client,Rect eye,Rect? spriteFrame=null)
+    {
+        bool standalone=spriteFrame!=null;
+        bool nativeLid=standalone||client==Client.Claude;
         var original=nativeLid?Art.Avatar(client):Art.Image("pile-scene");
         var expression=nativeLid?original:Art.Image("pile-expressions");
-        var scene=nativeLid?JarGeometry.ClaudeFrame:JarGeometry.SceneRect;
+        var scene=spriteFrame??(nativeLid?JarGeometry.ClaudeFrame:JarGeometry.SceneRect);
         int x=(int)Math.Round((eye.X-scene.X)/scene.Width*original.PixelWidth);
         int y=(int)Math.Round((eye.Y-scene.Y)/scene.Height*original.PixelHeight);
         int width=(int)Math.Round(eye.Width/scene.Width*original.PixelWidth);
@@ -72,7 +79,16 @@ internal sealed class EyeArtwork
         for(int i=0;i<face.Length;i++)face[i]=(byte)Math.Round(material[i]);
         Face=Bitmap(face,width,height);
         (Open,OpenRect)=Sprite(openPixels,openMask,width,height,eye);
-        if(nativeLid)(Closed,ClosedRect)=ClosedLid(OpenRect);
+        if(standalone&&client==Client.ChatGPT) {
+            Closed=Open;ClosedRect=OpenRect;
+            var visual=new DrawingVisual();using(var dc=visual.RenderOpen()) {
+                dc.DrawEllipse(Brushes.Black,null,new Point(32,32),21,26);
+                dc.DrawEllipse(Brushes.White,null,new Point(24,20),5,6);
+            }
+            var bitmap=new RenderTargetBitmap(64,64,96,96,PixelFormats.Pbgra32);bitmap.Render(visual);bitmap.Freeze();
+            Open=bitmap;OpenRect=new(ClosedRect.X,ClosedRect.Top-ClosedRect.Height*.65,ClosedRect.Width,ClosedRect.Height*2.1);
+        }
+        else if(nativeLid)(Closed,ClosedRect)=ClosedLid(OpenRect);
         else (Closed,ClosedRect)=Sprite(closedPixels,closedMask,width,height,eye);
     }
     private static (BitmapSource,Rect) ClosedLid(Rect open)

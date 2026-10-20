@@ -12,7 +12,8 @@ namespace PetJar;
 public static class Art
 {
     private static readonly Dictionary<string, BitmapSource> cache = new();
-    private static readonly Dictionary<Client, BitmapSource> avatars = new();
+    private static readonly Dictionary<string, BitmapSource> sprites = new();
+    private static readonly Dictionary<string, (byte[] pixels,int width,int height)> spritePixels = new();
     private static readonly Dictionary<Client, BitmapSource> hitImages = new();
     public static Stream Resource(string suffix)
     {
@@ -28,9 +29,11 @@ public static class Art
         bitmap.StreamSource = stream; bitmap.EndInit(); bitmap.Freeze(); cache[name] = bitmap; return bitmap;
     }
     public static BitmapSource Avatar(Client client)
+        => Sprite(client.Sprite());
+    internal static BitmapSource Sprite(string name)
     {
-        if(avatars.TryGetValue(client,out var cached))return cached;
-        var source=Image(client.Sprite());
+        if(sprites.TryGetValue(name,out var cached))return cached;
+        var source=Image(name);
         var bitmap=new FormatConvertedBitmap(source,PixelFormats.Bgra32,null,0);
         int width=bitmap.PixelWidth,height=bitmap.PixelHeight;
         var pixels=new byte[width*height*4];bitmap.CopyPixels(pixels,width*4,0);
@@ -46,7 +49,19 @@ public static class Art
         left=Math.Max(0,left-4);top=Math.Max(0,top-4);
         right=Math.Min(width-1,right+4);bottom=Math.Min(height-1,bottom+4);
         var cropped=new CroppedBitmap(source,new Int32Rect(left,top,right-left+1,bottom-top+1));
-        cropped.Freeze();avatars[client]=cropped;return cropped;
+        cropped.Freeze();sprites[name]=cropped;return cropped;
+    }
+    internal static bool SpriteContains(string name,Point unit)
+    {
+        if(unit.X<0||unit.X>=1||unit.Y<0||unit.Y>=1)return false;
+        if(!spritePixels.TryGetValue(name,out var data)) {
+            var source=Sprite(name);double scale=Math.Min(1,256d/Math.Max(source.PixelWidth,source.PixelHeight));
+            var bitmap=new FormatConvertedBitmap(new TransformedBitmap(source,new ScaleTransform(scale,scale)),PixelFormats.Bgra32,null,0);
+            var pixels=new byte[bitmap.PixelWidth*bitmap.PixelHeight*4];bitmap.CopyPixels(pixels,bitmap.PixelWidth*4,0);
+            var alpha=new byte[bitmap.PixelWidth*bitmap.PixelHeight];for(int i=0;i<alpha.Length;i++)alpha[i]=pixels[i*4+3];
+            spritePixels[name]=data=(alpha,bitmap.PixelWidth,bitmap.PixelHeight);
+        }
+        return data.pixels[(int)(unit.Y*data.height)*data.width+(int)(unit.X*data.width)]>64;
     }
     public static bool AvatarContains(Client client,Rect frame,Point point)
     {

@@ -1,15 +1,24 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks;
 
 namespace PetJar;
 
 public enum Client { ChatGPT, Grok, Muse, Claude }
-public enum DeliveryMode { Copy, Fill, Send, NewChat }
 public enum QuotaSource { Auto, Codex, Claude, Unavailable }
+public enum FillerKind { Wood, Blue, Knit, Chrome, Amber, Moss, Stone, Bubble }
+
+internal static class Fillers
+{
+    internal static string Sprite(this FillerKind kind)=>"prop-"+kind.ToString().ToLowerInvariant();
+    internal static string Name(this FillerKind kind)=>kind switch {
+        FillerKind.Wood=>"木纹方块",FillerKind.Blue=>"蓝色晶块",FillerKind.Knit=>"针织方块",FillerKind.Chrome=>"镜面星星",
+        FillerKind.Amber=>"琥珀方块",FillerKind.Moss=>"苔藓球",FillerKind.Stone=>"石纹方块",_=>"幻彩泡泡"};
+    internal static string Texture(this FillerKind kind)=>kind switch {
+        FillerKind.Wood=>"温润木纹",FillerKind.Blue=>"清透晶面",FillerKind.Knit=>"柔软针织",FillerKind.Chrome=>"闪亮金属",
+        FillerKind.Amber=>"暖色透光",FillerKind.Moss=>"蓬松绒感",FillerKind.Stone=>"自然石纹",_=>"轻盈幻彩"};
+}
 
 public static class Clients
 {
@@ -18,65 +27,16 @@ public static class Clients
     public static string Sprite(this Client client) => client switch { Client.ChatGPT => "pet-chatgpt", Client.Grok => "pet-grok-glossy", Client.Claude => "pet-claude", _ => "pet-muse" };
 }
 
-// Each stage is independent: an opened window is not proof of insertion or receipt.
-public sealed record DeliveryResult(string Message, bool Copied = false, bool Opened = false,
-    bool Inserted = false, bool SendClicked = false, bool ServerReceived = false);
-
-public static class DeliveryRules
-{
-    public static bool Empty(string text) => string.IsNullOrWhiteSpace(text);
-    public static bool CanInsert(string current, string descriptor, bool readOnly) =>
-        !readOnly && Empty(current) && IsComposer(descriptor) && !Excluded(descriptor);
-    public static bool IsComposer(string descriptor) => Contains(descriptor,
-        "message", "prompt", "ask anything", "ask grok", "ask chatgpt", "ask muse", "ask claude", "chat input", "composer",
-        "发消息", "发送消息", "输入消息", "消息输入", "询问", "提问", "输入指令", "任务描述");
-    public static bool Excluded(string descriptor) => Contains(descriptor,
-        "search", "搜索", "password", "密码", "address bar", "地址栏", "filter", "筛选", "rename", "重命名");
-    private static bool Contains(string text, params string[] words) => Array.Exists(words,
-        word => text.Contains(word, StringComparison.OrdinalIgnoreCase));
-    public static bool IsSend(string name) => Array.Exists(new[] { "send", "send message", "send prompt", "submit", "发送", "发送消息", "发送提示", "提交" },
-        value => string.Equals(value, name.Trim(), StringComparison.OrdinalIgnoreCase));
-    public static string NewChatUrl(string text) => "codex://new?prompt=" + Uri.EscapeDataString(text);
-    public static bool Valid(string text) => !Empty(text) && Encoding.UTF8.GetByteCount(text) <= 100_000;
-}
-
-public sealed class PetModel
-{
-    public Client Client { get; private set; }
-    private readonly Dictionary<Client, string> drafts = new();
-    private readonly Dictionary<Client, DeliveryMode> modes = new();
-    private readonly Dictionary<Client, DeliveryResult> results = new();
-    public bool Busy { get; private set; }
-    public string Draft { get => drafts.GetValueOrDefault(Client, ""); set { if (!Busy) drafts[Client] = value; } }
-    public DeliveryMode Mode { get => modes.GetValueOrDefault(Client, DeliveryMode.Copy); set { if (!Busy) modes[Client] = value; } }
-    public DeliveryResult? Result => results.GetValueOrDefault(Client);
-    public string Status => Result?.Message ?? $"先在 {Client.Name()} 中打开要通信的智能体或会话。";
-    public event Action? Changed;
-    public bool Select(Client client)
-    {
-        if (Busy) return false;
-        Client = client;
-        Changed?.Invoke();
-        return true;
-    }
-    public async Task SendAsync(Func<Client, string, DeliveryMode, Task<DeliveryResult>> deliver)
-    {
-        if (Busy || !DeliveryRules.Valid(Draft)) return;
-        var target = Client; var text = Draft; var mode = Mode;
-        Busy = true; Changed?.Invoke();
-        try { results[target] = await deliver(target, text, mode); }
-        catch (Exception e) { results[target] = new("投递已停止，源草稿仍保留。" + e.Message); }
-        finally { Busy = false; Changed?.Invoke(); }
-    }
-}
-
 public sealed class Settings
 {
     public double? Left { get; set; }
     public double? Top { get; set; }
+    // Missing in older settings means the original, full four-pet jar.
+    public HashSet<Client> JarPets { get; set; } = new(Enum.GetValues<Client>());
+    // Missing means the original mix; an explicit empty set means no fillers.
+    public HashSet<FillerKind> JarFillers { get; set; } = new(Enum.GetValues<FillerKind>());
     // Manual bindings are preserved; automatic bindings require installed product identity.
     public Dictionary<Client, string> Executables { get; set; } = new();
-    public Dictionary<Client, string> WindowTitles { get; set; } = new();
     public Dictionary<Client, QuotaSource> QuotaSources { get; set; } = new();
     public Dictionary<Client,string> AutoBindings { get; set; }=new();
     public Dictionary<Client,string> AppUserModelIds { get; set; }=new();
@@ -85,7 +45,9 @@ public sealed class Settings
     {
         try {
             var settings=JsonSerializer.Deserialize<Settings>(File.ReadAllText(FilePath))??new();
-            settings.Executables??=new();settings.WindowTitles??=new();settings.QuotaSources??=new();settings.AutoBindings??=new();settings.AppUserModelIds??=new();return settings;
+            settings.Executables??=new();settings.QuotaSources??=new();settings.AutoBindings??=new();settings.AppUserModelIds??=new();
+            settings.JarPets??=new(Enum.GetValues<Client>());settings.JarPets.RemoveWhere(client=>!Enum.IsDefined(client));
+            settings.JarFillers??=new(Enum.GetValues<FillerKind>());settings.JarFillers.RemoveWhere(kind=>!Enum.IsDefined(kind));return settings;
         }
         catch (Exception e) when (e is IOException or JsonException or UnauthorizedAccessException) { return new(); }
     }
@@ -98,5 +60,39 @@ public sealed class Settings
             File.Move(FilePath + ".tmp", FilePath, true); return true;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return false; }
+    }
+}
+
+internal sealed class FillerCollection(Settings settings,Func<bool>? save=null)
+{
+    internal event Action? Changed;
+    internal bool Contains(FillerKind kind)=>settings.JarFillers.Contains(kind);
+    internal bool Matches(IEnumerable<FillerKind> kinds)=>settings.JarFillers.SetEquals(kinds);
+    internal bool SetSelection(IEnumerable<FillerKind> kinds)
+    {
+        var next=new HashSet<FillerKind>(kinds);
+        foreach(var kind in next)if(!Enum.IsDefined(kind))return false;
+        if(settings.JarFillers.SetEquals(next))return true;
+        var previous=settings.JarFillers;settings.JarFillers=next;
+        if(!(save??settings.Save)()) {settings.JarFillers=previous;return false;}
+        Changed?.Invoke();return true;
+    }
+}
+
+// Membership changes are saved as one transaction and preserve client bindings and account sources.
+internal sealed class PetCollection(Settings settings,Func<bool>? save=null)
+{
+    internal event Action? Changed;
+    internal bool Contains(Client client)=>settings.JarPets.Contains(client);
+    internal int Count=>settings.JarPets.Count;
+    internal bool Update(IEnumerable<Client> added,IEnumerable<Client> removed)
+    {
+        var next=new HashSet<Client>(settings.JarPets);
+        foreach(var client in added) {if(!Enum.IsDefined(client))return false;next.Add(client);}
+        foreach(var client in removed) {if(!Enum.IsDefined(client))return false;next.Remove(client);}
+        if(next.SetEquals(settings.JarPets))return true;
+        var previous=settings.JarPets;settings.JarPets=next;
+        if(!(save??settings.Save)()) {settings.JarPets=previous;return false;}
+        Changed?.Invoke();return true;
     }
 }

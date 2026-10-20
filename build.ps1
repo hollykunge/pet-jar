@@ -2,7 +2,6 @@
 param(
     [switch]$Run,
     [switch]$Package,
-    [switch]$DeliveryTest,
     [ValidateSet('win-x64','win-arm64')][string]$Runtime = 'win-x64'
 )
 $ErrorActionPreference = 'Stop'
@@ -47,17 +46,10 @@ if ($Runtime -eq 'win-x64' -and $env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { Write
 $test = Start-Process -FilePath $exePath -ArgumentList @('--self-test', '--test-report', "`"$reportPath`"") -Wait -PassThru
 if (Test-Path -LiteralPath $reportPath) { Get-Content -LiteralPath $reportPath }
 if ($test.ExitCode -ne 0) { throw "Windows self-test failed (exit $($test.ExitCode))." }
-if ($DeliveryTest) {
-    $deliveryReport = Join-Path $projectRoot '.build\windows\delivery-test.txt'
-    Write-Output 'Click the native test window to begin. Windows requires foreground input authorization for paste simulation.'
-    $test = Start-Process -FilePath $exePath -ArgumentList @('--delivery-test-ui','--test-report',"`"$deliveryReport`"") -WindowStyle Normal -Wait -PassThru
-    if (Test-Path -LiteralPath $deliveryReport) { Get-Content -LiteralPath $deliveryReport }
-    if ($test.ExitCode -ne 0) { throw "Native delivery fixture test failed (exit $($test.ExitCode))." }
-}
 if ($Package) {
     $zipPath = Join-Path $projectRoot "dist\宠物罐-Windows-$Runtime.zip"
-    Compress-Archive -LiteralPath $exePath -DestinationPath $zipPath -Force
+    Compress-Archive -LiteralPath @($exePath,(Join-Path $outputPath 'THIRD-PARTY-NOTICES.txt')) -DestinationPath $zipPath -Force
     Write-Output "Packaged: $zipPath"
 }
 Write-Output "Built: $exePath"
-if ($Run) { Start-Process -FilePath $exePath -WindowStyle Normal }
+if ($Run) { Start-Process -FilePath $exePath -WindowStyle Hidden }

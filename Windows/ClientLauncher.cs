@@ -29,14 +29,12 @@ internal sealed class ClientLauncher(Settings settings)
             return new(false,true,$"先选择 {client.Name()} 对应的客户端。");
         try
         {
-            // Opening a client never touches a draft, clipboard or send control.
-            // Use the frontmost matching application window; conversation title
-            // restrictions continue to apply only to the separate delivery flow.
-            var matches=Native.Matching(path,"");
+            // Activate the frontmost matching application window.
+            var matches=Native.Matching(path);
             if(matches.Count==0) {
                 if(settings.AppUserModelIds.TryGetValue(client,out var appId)&&settings.AutoBindings.GetValueOrDefault(client)==path)Native.ActivatePackage(appId);
                 else Process.Start(new ProcessStartInfo(path) {UseShellExecute=true})?.Dispose();
-                for(int i=0;i<50&&matches.Count==0;i++) {await Task.Delay(200);matches=Native.Matching(path,"");}
+                for(int i=0;i<50&&matches.Count==0;i++) {await Task.Delay(200);matches=Native.Matching(path);}
             }
             if(matches.Count==0)return new(false,false,$"已请求打开 {client.Name()}，尚未确认客户端窗口。");
             var target=matches[0];

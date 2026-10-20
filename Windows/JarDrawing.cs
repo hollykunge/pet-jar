@@ -11,16 +11,17 @@ public sealed class JarDrawing : FrameworkElement
     private readonly VisualCollection layers;
     private readonly Dictionary<Client,EyelidVisual[]> eyes=new();
     private readonly Dictionary<Client,EyePose> poses=new();
+    private readonly DrawingVisual back=new(),front=new();
+    private readonly HashSet<Client> present=new(Enum.GetValues<Client>());
     private readonly DrawingVisual hint=new();
-    private Client? hovered,selected;
+    private Client? hovered;
     private bool showHint=true;
     public Client? Hovered { get=>hovered;set {if(hovered==value)return;hovered=value;DrawHint();} }
-    public Client? Selected { get=>selected;set {if(selected==value)return;selected=value;DrawHint();} }
     public bool ShowHint { get=>showHint;set {if(showHint==value)return;showHint=value;DrawHint();} }
     public JarDrawing()
     {
         layers=new VisualCollection(this);
-        var back=new DrawingVisual();using(var dc=back.RenderOpen())DrawBack(dc);layers.Add(back);
+        using(var dc=back.RenderOpen())DrawBack(dc);layers.Add(back);
         foreach(var client in Enum.GetValues<Client>())
         {
             var pair=new List<EyelidVisual>();
@@ -31,13 +32,43 @@ public sealed class JarDrawing : FrameworkElement
             }
             eyes[client]=pair.ToArray();poses[client]=default;
         }
-        var front=new DrawingVisual();using(var dc=front.RenderOpen())DrawFront(dc);layers.Add(front);
+        using(var dc=front.RenderOpen())DrawFront(dc);layers.Add(front);
         layers.Add(hint);DrawHint();
     }
     protected override int VisualChildrenCount=>layers.Count;
     protected override Visual GetVisualChild(int index)=>layers[index];
     protected override void OnDpiChanged(DpiScale oldDpi,DpiScale newDpi) {base.OnDpiChanged(oldDpi,newDpi);DrawHint();}
     internal EyePose GetEyes(Client client)=>poses[client];
+    internal bool Contains(Client client)=>present.Contains(client);
+    internal void SetPets(IEnumerable<Client> clients)
+    {
+        var next=new HashSet<Client>(clients);
+        if(present.SetEquals(next))return;
+        present.Clear();present.UnionWith(next);
+        foreach(var (client,pair) in eyes)foreach(var eye in pair)eye.Opacity=Contains(client)?1:0;
+        if(Hovered is Client hover&&!Contains(hover))Hovered=null;
+        using(var dc=back.RenderOpen())DrawBack(dc);
+        using(var dc=front.RenderOpen())DrawFront(dc);
+        DrawHint();
+    }
+    private Geometry SceneClip()
+    {
+        // The original three bodies are baked into the same scene. Remove their
+        // visible silhouettes from BOTH the main image and the glass reflection.
+        // Keep any overlapping enabled pet's region intact.
+        Geometry removed=Geometry.Empty,kept=Geometry.Empty;
+        foreach(var client in new[] {Client.ChatGPT,Client.Grok,Client.Muse})
+        {
+            if(Contains(client))kept=new CombinedGeometry(GeometryCombineMode.Union,kept,JarGeometry.Regions[client]);
+            else removed=new CombinedGeometry(GeometryCombineMode.Union,removed,JarGeometry.Regions[client]);
+        }
+        removed=new CombinedGeometry(GeometryCombineMode.Exclude,removed,kept);
+        return new CombinedGeometry(GeometryCombineMode.Exclude,new RectangleGeometry(JarGeometry.SceneRect),removed);
+    }
+    private void DrawScene(DrawingContext dc,Rect frame)
+    {
+        dc.PushClip(SceneClip());dc.DrawImage(Art.Image("pile-scene"),frame);dc.Pop();
+    }
     internal void SetEyes(Client client,EyePose pose)
     {
         pose=new(Math.Clamp(pose.Left,0,1),Math.Clamp(pose.Right,0,1));
@@ -67,7 +98,15 @@ public sealed class JarDrawing : FrameworkElement
         dc.DrawGeometry(null,Pen(Brush(.26,.44,.46,.47),.75),JarGeometry.Oval(22,238,216,16));
         dc.DrawGeometry(null,Pen(White(.63),.65),JarGeometry.Oval(23,238.8,214,14.4));
     }
-    private static void DrawBack(DrawingContext dc)
+    private void DrawBack(DrawingContext dc)
+    {
+        DrawGlassBack(dc);
+        dc.PushClip(JarGeometry.Interior);
+        DrawScene(dc,JarGeometry.SceneRect);
+        if(Contains(Client.Claude))dc.DrawImage(Art.Avatar(Client.Claude),JarGeometry.ClaudeFrame);
+        dc.Pop();
+    }
+    internal static void DrawGlassBack(DrawingContext dc)
     {
         dc.PushTransform(JarGeometry.GlassTransform);
         // Rear layers always precede the contents.
@@ -76,19 +115,21 @@ public sealed class JarDrawing : FrameworkElement
         dc.DrawGeometry(Gradient(new[] { Color(.35,.47,.47,.17),Color(1,1,1,.08) },90),null,JarGeometry.Oval(22,238,216,16));
         dc.PushClip(new RectangleGeometry(JarGeometry.MacRect(0,246,260,14))); Lip(dc); dc.Pop(); dc.Pop();
 
-        dc.PushClip(JarGeometry.Interior);
-        dc.DrawImage(Art.Image("pile-scene"),JarGeometry.SceneRect);
-        dc.DrawImage(Art.Avatar(Client.Claude),JarGeometry.ClaudeFrame);
-        dc.Pop();
     }
-    private static void DrawFront(DrawingContext dc)
+    private void DrawFront(DrawingContext dc)=>DrawGlassFront(dc,DrawScene);
+    internal static void DrawGlassFront(DrawingContext dc,Action<DrawingContext,Rect>? reflectionImage=null)
     {
         dc.PushTransform(JarGeometry.GlassTransform);
         dc.PushClip(JarGeometry.Body);
         dc.DrawGeometry(Gradient(new[] { Color(.30,.53,.57,.35),Color(1,1,1,.28),Colors.Transparent,Colors.Transparent,Colors.Transparent,Color(1,1,1,.13),Color(.30,.50,.54,.36) }),null,JarGeometry.Body);
         var edges=new GeometryGroup(); edges.Children.Add(new RectangleGeometry(JarGeometry.MacRect(13,48,11,183))); edges.Children.Add(new RectangleGeometry(JarGeometry.MacRect(236,48,11,183)));
         dc.PushClip(edges); dc.PushOpacity(.23);
-        dc.DrawImage(Art.Image("pile-scene"),JarGeometry.MacRect(13,39,234,216)); dc.Pop(); dc.Pop();
+        // Transform the membership mask with the reflected image as well.
+        var reflection=JarGeometry.MacRect(13,39,234,216);
+        var scene=JarGeometry.SceneRect;
+        dc.PushTransform(new MatrixTransform(new Matrix(reflection.Width/scene.Width,0,0,reflection.Height/scene.Height,
+            reflection.X-scene.X*reflection.Width/scene.Width,reflection.Y-scene.Y*reflection.Height/scene.Height)));
+        reflectionImage?.Invoke(dc,scene);dc.Pop();dc.Pop();dc.Pop();
         // Only the front half of the base is allowed over the contents.
         dc.PushClip(new RectangleGeometry(JarGeometry.MacRect(0,0,260,37)));
         dc.DrawGeometry(Gradient(new[] { Color(.32,.53,.55,.4),Color(1,1,1,.72),Color(.66,.80,.79,.38),Color(1,1,1,.72) },90),null,
@@ -114,7 +155,7 @@ public sealed class JarDrawing : FrameworkElement
         using var dc=hint.RenderOpen();
         if (ShowHint)
         {
-            var text=new FormattedText(Hovered?.Name()??Selected?.Name()??"双击打开 · 悬停看额度",CultureInfo.CurrentUICulture,FlowDirection.LeftToRight,
+            var text=new FormattedText(Hovered?.Name()??(present.Count==0?"右键 · 从宠物橱窗添加":"双击打开 · 悬停看额度"),CultureInfo.CurrentUICulture,FlowDirection.LeftToRight,
                 new Typeface("Microsoft YaHei UI"),10,Brush(.35,.35,.35),VisualTreeHelper.GetDpi(this).PixelsPerDip);
             dc.DrawText(text,new((260-text.Width)/2,242));
         }

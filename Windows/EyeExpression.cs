@@ -2,7 +2,7 @@ using System;
 
 namespace PetJar;
 
-internal enum EyeMood { Idle, Hover, Chatting }
+internal enum EyeMood { Idle, Hover }
 internal readonly record struct EyePose(double Left,double Right)
 {
     internal static EyePose Blend(EyePose from,EyePose to,double amount) =>
@@ -39,8 +39,7 @@ internal static class EyeExpression
             return new(left,right);
         }
         // Greeting, attentive blinking and occasional winks use the same eye art.
-        double blink=client==Client.ChatGPT?0:Blink(age-.06,mood==EyeMood.Chatting?.30:.36);
-        if(mood==EyeMood.Chatting && client!=Client.ChatGPT)blink=Math.Max(blink,Blink(age-.48,.28));
+        double blink=client==Client.ChatGPT?0:Blink(age-.06,.36);
         double periodA=3.1+identity*.31, periodB=4.05+identity*.23;
         double phaseA=Math.Max(0,age-1.7)%(periodA+periodB);
         double recurring=Math.Max(Blink(phaseA-.7),Blink(phaseA-periodA-.7));
